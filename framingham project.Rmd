@@ -1,0 +1,121 @@
+---
+title: "framgingham project"
+author: "MZ"
+date: "November 11, 2017"
+output: html_document
+---
+# Loading and mutating data
+```{r}
+library(tidyverse)
+library(foreign)
+fram <- read.dta(file = "C:/Users/Lem/Dropbox (CBQG)/BST210/homework/hw5/framingham.dta")
+
+fram <- fram %>% mutate(metabolic = ifelse((totchol > 240 & (sysbp > 130 | bpmeds == 1 | prevhyp == 1) & bmicat > 2), 1, 0))
+
+fram %>% filter(diabetes == 1) %>% dim()
+
+fram %>% filter(prevhyp == 1) %>% dim()
+
+fram <- fram %>% mutate(obese = ifelse((bmicat > 3), 1, 0))
+fram <- fram %>% mutate(htc = ifelse((totchol > 240), 1, 0))
+```
+
+#Survival Analysis (K-M and log rank test)
+```{r}
+library(survival)
+#Metabolic syndrome
+mortality <- Surv(time = fram$timedth, event = fram$death)
+model_m <- survfit(mortality ~ metabolic, data = fram)
+
+#KM
+plot(model_m,col = c(2,3), xlab = "Days", ylab = "Survival")
+#log rank
+survdiff(mortality ~ metabolic, data = fram)
+
+#Hypertension
+mortality <- Surv(time = fram$timedth, event = fram$death)
+model_m <- survfit(mortality ~ prevhyp, data = fram)
+#KM
+plot(model_m,col = c(2,3), xlab = "Days", ylab = "Survival")
+#log rank
+survdiff(mortality ~ prevhyp, data = fram)
+
+#Diabetes
+mortality <- Surv(time = fram$timedth, event = fram$death)
+model_m <- survfit(mortality ~ diabetes, data = fram)
+#KM
+plot(model_m,col = c(2,3), xlab = "Days", ylab = "Survival")
+#log rank
+survdiff(mortality ~ diabetes, data = fram)
+
+#Obesity
+mortality <- Surv(time = fram$timedth, event = fram$death)
+model_m <- survfit(mortality ~ obese, data = fram)
+#KM
+plot(model_m,col = c(2,3), xlab = "Days", ylab = "Survival")
+#log rank
+survdiff(mortality ~ obese, data = fram)
+
+#Angina
+mortality <- Surv(time = fram$timedth, event = fram$death)
+model_m <- survfit(mortality ~ prevap, data = fram)
+#KM
+plot(model_m,col = c(2,3), xlab = "Days", ylab = "Survival")
+#log rank
+survdiff(mortality ~ prevap, data = fram)
+
+#CHD
+mortality <- Surv(time = fram$timedth, event = fram$death)
+model_m <- survfit(mortality ~ prevchd, data = fram)
+#KM
+plot(model_m,col = c(2,3), xlab = "Days", ylab = "Survival")
+#log rank
+survdiff(mortality ~ prevchd, data = fram)
+
+#MI
+mortality <- Surv(time = fram$timedth, event = fram$death)
+model_m <- survfit(mortality ~ prevmi, data = fram)
+#KM
+plot(model_m,col = c(2,3), xlab = "Days", ylab = "Survival")
+#log rank
+survdiff(mortality ~ prevmi, data = fram)
+
+#Stroke
+mortality <- Surv(time = fram$timedth, event = fram$death)
+model_m <- survfit(mortality ~ prevstrk, data = fram)
+#KM
+plot(model_m,col = c(2,3), xlab = "Days", ylab = "Survival")
+#log rank
+survdiff(mortality ~ prevstrk, data = fram)
+
+#smoking
+mortality <- Surv(time = fram$timedth, event = fram$death)
+model_m <- survfit(mortality ~ cursmoke, data = fram)
+#KM
+plot(model_m,col = c(2,3), xlab = "Days", ylab = "Survival")
+#log rank
+survdiff(mortality ~ cursmoke, data = fram)
+
+#Part 2: Parametric models
+model2 = survreg(survobj ~ sorb+tgh+dur+sex, dist="exponential", data=srt)
+```
+
+#Proportional Hazards Model
+```{r}
+model_c = coxph(mortality ~ metabolic, data = fram)
+plot(survfit(model_c))
+summary(model_c)
+
+
+```
+
+#GLM (gamma, binomial, poisson, gaussian, inverse.gaussian, quasi, quasibinominal, quasipoisson)
+```{r}
+summary(glm(death ~ metabolic, data = fram, offset = log(timedth), family = poisson()))
+summary(glm(death ~ metabolic, data = fram, family = binomial()))
+summary(glm(death ~ prevhyp + diabetes + prevchd + agecat + sex, data = fram, family = binomial()))
+summary(glm(death ~ metabolic + prevhyp + diabetes + prevchd, data = fram, offset = log(timedth), family = poisson()))
+summary(glm(death ~ agecat + cigpday + sysbp + bmicat + glucose + totchol + sex + heartrte, data = fram, offset = log(timedth), family = poisson()))
+
+```
+
