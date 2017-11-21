@@ -6,18 +6,34 @@ output: html_document
 ---
 # Loading and mutating data
 ```{r}
-library(tidyverse)
+#library(tidyverse)
+library(dplyr)
 library(foreign)
-fram <- read.dta(file = "C:/Users/Lem/Dropbox (CBQG)/BST210/homework/hw5/framingham.dta")
+#fram <- read.dta(file = "C:/Users/Lem/Dropbox (CBQG)/BST210/homework/hw5/framingham.dta")
+fram <- read.dta(file = "~/BST210/framingham.dta")
 
-fram <- fram %>% mutate(metabolic = ifelse((totchol > 240 & (sysbp > 130 | bpmeds == 1 | prevhyp == 1) & bmicat > 2), 1, 0))
+fram <- fram %>% mutate(metabolic = ifelse((totchol > 240 & sysbp > 130 & bpmeds == 0 & prevhyp == 0 & bmicat > 2), 1, 0))
 
 fram %>% filter(diabetes == 1) %>% dim()
-
 fram %>% filter(prevhyp == 1) %>% dim()
+fram %>% filter(prevchd == 1) %>% dim()
+fram %>% filter(metabolic ==1) %>% dim()
 
 fram <- fram %>% mutate(obese = ifelse((bmicat > 3), 1, 0))
 fram <- fram %>% mutate(htc = ifelse((totchol > 240), 1, 0))
+
+#number of pre-existing conditions
+fram <- fram %>% mutate(preexisting = diabetes + prevhyp + prevchd + prevstrk, preexisting_m = diabetes + prevhyp + prevchd + prevstrk + metabolic)
+fram$preexisting[fram$preexisting==4] <- 2
+fram$preexisting[fram$preexisting==3] <- 2
+fram$preexisting_m[fram$preexisting_m==4] <- 2
+fram$preexisting_m[fram$preexisting_m==3] <- 2
+
+#Table for figure 1
+fram %>% group_by(sex) %>% summarize(length(sex)) 
+fram %>% group_by(preexisting) %>% summarize(length(preexisting))
+fram %>% group_by(preexisting_m) %>% summarize(length(preexisting_m))
+
 ```
 
 #Survival Analysis (K-M and log rank test)
@@ -72,22 +88,6 @@ plot(model_m,col = c(2,3), xlab = "Days", ylab = "Survival")
 #log rank
 survdiff(mortality ~ prevchd, data = fram)
 
-#MI
-mortality <- Surv(time = fram$timedth, event = fram$death)
-model_m <- survfit(mortality ~ prevmi, data = fram)
-#KM
-plot(model_m,col = c(2,3), xlab = "Days", ylab = "Survival")
-#log rank
-survdiff(mortality ~ prevmi, data = fram)
-
-#Stroke
-mortality <- Surv(time = fram$timedth, event = fram$death)
-model_m <- survfit(mortality ~ prevstrk, data = fram)
-#KM
-plot(model_m,col = c(2,3), xlab = "Days", ylab = "Survival")
-#log rank
-survdiff(mortality ~ prevstrk, data = fram)
-
 #smoking
 mortality <- Surv(time = fram$timedth, event = fram$death)
 model_m <- survfit(mortality ~ cursmoke, data = fram)
@@ -96,16 +96,73 @@ plot(model_m,col = c(2,3), xlab = "Days", ylab = "Survival")
 #log rank
 survdiff(mortality ~ cursmoke, data = fram)
 
+#Pre-existing conditions, excluding metabolic
+mortality <- Surv(time = fram$timedth, event = fram$death)
+model_m <- survfit(mortality ~ preexisting, data = fram)
+#KM
+plot(model_m,col = c(2,3), xlab = "Days", ylab = "Survival")
+#log rank
+survdiff(mortality ~ preexisting, data = fram)
+
+#Pre-existing conditions, including metabolic
+mortality <- Surv(time = fram$timedth, event = fram$death)
+model_m <- survfit(mortality ~ preexisting_m, data = fram)
+#KM
+plot(model_m,col = c(2,3), xlab = "Days", ylab = "Survival")
+#log rank
+survdiff(mortality ~ preexisting_m, data = fram)
+
 #Part 2: Parametric models
 model2 = survreg(survobj ~ sorb+tgh+dur+sex, dist="exponential", data=srt)
 ```
 
 #Proportional Hazards Model
 ```{r}
-model_c = coxph(mortality ~ metabolic, data = fram)
+#Metabolic
+model_c = coxph(mortality ~ metabolic + age + sex, data = fram)
 plot(survfit(model_c))
 summary(model_c)
+#with smoking
+model_sc = coxph(mortality ~ metabolic + age + sex + cigpday, data = fram)
+plot(survfit(model_sc))
+summary(model_sc)
 
+#Hypertension
+model_c = coxph(mortality ~ prevhyp + age + sex, data = fram)
+plot(survfit(model_c))
+summary(model_c)
+#with smoking
+model_sc = coxph(mortality ~ prevhyp + age + sex + cigpday, data = fram)
+plot(survfit(model_sc))
+summary(model_sc)
+
+#Diabetes
+model_c = coxph(mortality ~ diabetes + age + sex, data = fram)
+plot(survfit(model_c))
+summary(model_c)
+#with smoking
+model_sc = coxph(mortality ~ diabetes + age + sex + cigpday, data = fram)
+plot(survfit(model_sc))
+summary(model_sc)
+
+#CHD
+model_c = coxph(mortality ~ prevchd + age + sex, data = fram)
+plot(survfit(model_c))
+summary(model_c)
+#with smoking
+model_sc = coxph(mortality ~ prevchd + age + sex + cigpday, data = fram)
+plot(survfit(model_sc))
+summary(model_sc)
+
+
+#All
+model_c = coxph(mortality ~ metabolic + prevhyp + diabetes + prevchd + age + sex, data = fram)
+plot(survfit(model_c))
+summary(model_c)
+#with smoking
+model_sc = coxph(mortality ~ metabolic + prevhyp + diabetes + prevchd + age + sex + cigpday, data = fram)
+plot(survfit(model_sc))
+summary(model_sc)
 
 ```
 
