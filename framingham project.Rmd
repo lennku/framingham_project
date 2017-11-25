@@ -2,18 +2,22 @@
 title: "framgingham project"
 author: "MZ"
 date: "November 11, 2017"
-output: html_document
+output: 
+  html_document: 
+    fig_height: 6
+    fig_width: 78
 ---
 # Loading and mutating data
 ```{r}
-#library(tidyverse)
-library(dplyr)
-library(foreign)
+library(tidyverse)
+#library(dplyr)
+#library(foreign)
 #fram <- read.dta(file = "C:/Users/Lem/Dropbox (CBQG)/BST210/homework/hw5/framingham.dta")
-fram <- read.dta(file = "~/BST210/framingham.dta")
+#fram <- read.dta(file = "~/BST210/framingham.dta")
 
-fram <- fram %>% mutate(metabolic = ifelse((totchol > 240 & sysbp > 130 & bpmeds == 0 & prevhyp == 0 & bmicat > 2), 1, 0))
+fram <- fram %>% mutate(metabolic = ifelse((totchol > 240 & (sysbp > 130 | bpmeds == 1) & bmicat > 2), 1, 0)) %>% filter(!is.na(totchol) & !is.na(sysbp) & !is.na(bpmeds) &!is.na(prevhyp) & !is.na(bmicat) & !is.na(diabetes) & !is.na(prevchd) & !is.na(prevstrk) & !is.na(age) & !is.na(sex) & !is.na(cigpday) & !is.na(cursmoke)) %>% mutate(id = agecat*sex)
 
+dim(fram)
 fram %>% filter(diabetes == 1) %>% dim()
 fram %>% filter(prevhyp == 1) %>% dim()
 fram %>% filter(prevchd == 1) %>% dim()
@@ -33,6 +37,8 @@ fram$preexisting_m[fram$preexisting_m==3] <- 2
 fram %>% group_by(sex) %>% summarize(length(sex)) 
 fram %>% group_by(preexisting) %>% summarize(length(preexisting))
 fram %>% group_by(preexisting_m) %>% summarize(length(preexisting_m))
+
+fram %>% filter(agecat ==2 & sex == 2 & preexisting == 0) %>% dim()
 
 ```
 
@@ -116,6 +122,103 @@ survdiff(mortality ~ preexisting_m, data = fram)
 model2 = survreg(survobj ~ sorb+tgh+dur+sex, dist="exponential", data=srt)
 ```
 
+#ggplot survival curves
+```{r}
+library(survminer)
+#Metabolic syndrome ***
+mortality <- Surv(time = fram$timedth, event = fram$death)
+model_m <- survfit(mortality ~ metabolic, data = fram)
+ggsurvplot(model_m, data = fram, risk.table = TRUE, pval = TRUE, conf.int = TRUE, ggtheme = theme_minimal(), risk.table.fontsize = 3)
+#KM
+plot(model_m,col = c(2,3), xlab = "Days", ylab = "Survival")
+#log rank
+survdiff(mortality ~ metabolic, data = fram)
+
+#Hypertension
+mortality <- Surv(time = fram$timedth, event = fram$death)
+model_m <- survfit(mortality ~ prevhyp, data = fram)
+ggsurvplot(model_m, data = fram, risk.table = TRUE)
+#KM
+plot(model_m,col = c(2,3), xlab = "Days", ylab = "Survival")
+#log rank
+survdiff(mortality ~ prevhyp, data = fram)
+
+#Diabetes ***
+mortality <- Surv(time = fram$timedth, event = fram$death)
+model_m <- survfit(mortality ~ diabetes, data = fram)
+ggsurvplot(model_m, data = fram, risk.table = TRUE, pval = TRUE, conf.int = TRUE, ggtheme = theme_minimal(), risk.table.fontsize = 3)
+#KM
+plot(model_m,col = c(2,3), xlab = "Days", ylab = "Survival")
+#log rank
+survdiff(mortality ~ diabetes, data = fram)
+
+#Obesity
+mortality <- Surv(time = fram$timedth, event = fram$death)
+model_m <- survfit(mortality ~ obese, data = fram)
+ggsurvplot(model_m, data = fram, risk.table = TRUE)
+#KM
+plot(model_m,col = c(2,3), xlab = "Days", ylab = "Survival")
+#log rank
+survdiff(mortality ~ obese, data = fram)
+
+#Angina
+mortality <- Surv(time = fram$timedth, event = fram$death)
+model_m <- survfit(mortality ~ prevap, data = fram)
+ggsurvplot(model_m, data = fram, risk.table = TRUE)
+#KM
+plot(model_m,col = c(2,3), xlab = "Days", ylab = "Survival")
+#log rank
+survdiff(mortality ~ prevap, data = fram)
+
+#CHD
+mortality <- Surv(time = fram$timedth, event = fram$death)
+model_m <- survfit(mortality ~ prevchd, data = fram)
+ggsurvplot(model_m, data = fram, risk.table = TRUE)
+#KM
+plot(model_m,col = c(2,3), xlab = "Days", ylab = "Survival")
+#log rank
+survdiff(mortality ~ prevchd, data = fram)
+
+#smoking
+mortality <- Surv(time = fram$timedth, event = fram$death)
+model_m <- survfit(mortality ~ cursmoke, data = fram)
+ggsurvplot(model_m, data = fram, risk.table = TRUE)
+#KM
+plot(model_m,col = c(2,3), xlab = "Days", ylab = "Survival")
+#log rank
+survdiff(mortality ~ cursmoke, data = fram)
+
+#Pre-existing conditions, excluding metabolic ****
+mortality <- Surv(time = fram$timedth, event = fram$death)
+model_m <- survfit(mortality ~ preexisting, data = fram)
+ggsurvplot(model_m, data = fram, risk.table = TRUE, pval = TRUE, conf.int = TRUE, ggtheme = theme_minimal(), risk.table.fontsize = 3,  legend.labs = c(0, 1, "2+"), title = "Pre-existing conditions vs Survival")
+#KM
+plot(model_m,col = c(2,3), xlab = "Days", ylab = "Survival")
+#log rank
+survdiff(mortality ~ preexisting, data = fram)
+
+#Pre-existing conditions + smoking
+mortality <- Surv(time = fram$timedth, event = fram$death)
+model_m <- survfit(mortality ~ preexisting + cursmoke, data = fram)
+ggsurvplot(model_m, data = fram, risk.table = TRUE, pval = TRUE, conf.int = TRUE, ggtheme = theme_minimal(), risk.table.fontsize = 2, title = "Pre-existing conditions and smoking status vs Survival")
+#KM
+plot(model_m,col = c(2,3), xlab = "Days", ylab = "Survival")
+#log rank
+survdiff(mortality ~ preexisting, data = fram)
+
+#Pre-existing conditions, including metabolic
+mortality <- Surv(time = fram$timedth, event = fram$death)
+model_m <- survfit(mortality ~ preexisting_m, data = fram)
+ggsurvplot(model_m, data = fram, risk.table = TRUE)
+#KM
+plot(model_m,col = c(2,3), xlab = "Days", ylab = "Survival")
+#log rank
+survdiff(mortality ~ preexisting_m, data = fram)
+
+#Part 2: Parametric models
+model2 = survreg(survobj ~ sorb+tgh+dur+sex, dist="exponential", data=srt)
+```
+
 #Proportional Hazards Model
 ```{r}
 #Metabolic
@@ -155,13 +258,38 @@ plot(survfit(model_sc))
 summary(model_sc)
 
 
-#All
-model_c = coxph(mortality ~ metabolic + prevhyp + diabetes + prevchd + age + sex, data = fram)
+#All *** 
+model_c = coxph(mortality ~ metabolic + prevhyp + diabetes + prevchd + prevstrk + age + sex, data = fram)
 plot(survfit(model_c))
 summary(model_c)
-#with smoking
-model_sc = coxph(mortality ~ metabolic + prevhyp + diabetes + prevchd + age + sex + cigpday, data = fram)
+
+model_c = coxph(mortality ~ metabolic + preexisting + age + sex, data = fram)
+plot(survfit(model_c))
+summary(model_c)
+
+
+#with smoking *** 
+model_sc = coxph(mortality ~ metabolic + prevhyp + diabetes + prevchd + prevstrk + age + sex + cigpday, data = fram)
 plot(survfit(model_sc))
+summary(model_sc)
+
+model_sc = coxph(mortality ~ metabolic + preexisting + age + sex + cigpday, data = fram)
+plot(survfit(model_sc))
+summary(model_sc)
+
+#EM smoking ***
+model_sc = coxph(mortality ~ metabolic + metabolic*cigpday + prevhyp + prevhyp*cigpday + diabetes + diabetes*cigpday + prevchd + prevchd*cigpday + prevstrk + prevstrk*cigpday + age + age*cigpday + sex + sex*cigpday + cigpday, data = fram)
+plot(survfit(model_sc))
+summary(model_sc)
+model_sc = coxph(mortality ~ metabolic + prevhyp + diabetes + prevchd + prevstrk + age + sex + sex*cigpday + cigpday, data = fram) # best mod
+plot(survfit(model_sc))
+summary(model_sc)
+
+model_sc = coxph(mortality ~ metabolic + preexisting + age + sex + cigpday + metabolic*cigpday + preexisting*cigpday + age*cigpday + sex*cigpday, data = fram)
+plot(survfit(model_sc))
+summary(model_sc)
+model_sc = coxph(mortality ~ metabolic + preexisting + age + sex + cigpday + sex*cigpday, data = fram)
+plot(survfit(model_sc)) # best mod
 summary(model_sc)
 
 ```
@@ -174,5 +302,29 @@ summary(glm(death ~ prevhyp + diabetes + prevchd + agecat + sex, data = fram, fa
 summary(glm(death ~ metabolic + prevhyp + diabetes + prevchd, data = fram, offset = log(timedth), family = poisson()))
 summary(glm(death ~ agecat + cigpday + sysbp + bmicat + glucose + totchol + sex + heartrte, data = fram, offset = log(timedth), family = poisson()))
 
+```
+
+#Testing proportional hazards assumption (inbetween pre-existing conditions, and smoking vs nonsmoking)
+[https://www.r-bloggers.com/cox-model-assumptions/]
+```{r}
+test_ph <- cox.zph(model_sc)
+ggcoxzph(test_ph)
+```
+In the figure above, the solid line is a smoothing spline fit to the plot, with the dashed lines representing a +/- 2-standard-error band around the fit.
+
+Note that, systematic departures from a horizontal line are indicative of non-proportional hazards, since proportional hazards assumes that estimates  do not vary much over time.
+
+From the graphical inspection, there is no pattern with time. The assumption of proportional hazards appears to be supported for the covariates sex (which is, recall, a two-level factor, accounting for the two bands in the graph), wt.loss and age.
+
+#Outliers
+```{r}
+ggcoxdiagnostics(model_sc, type = "dfbeta",
+                 linear.predictions = FALSE, ggtheme = theme_bw())
+```
+The above index plots show that comparing the magnitudes of the largest dfbeta values to the regression coefficients suggests that none of the observations is terribly influential individually, even though some of the dfbeta values for age and wt.loss are large compared with the others.
+
+#Conditional modeling
+```{r}
+model_cond <- clogit(death ~ metabolic + preexisting + strata(sex), data=fram)
 ```
 
