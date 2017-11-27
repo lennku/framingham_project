@@ -11,8 +11,8 @@ output:
 ```{r}
 library(tidyverse)
 #library(dplyr)
-#library(foreign)
-#fram <- read.dta(file = "C:/Users/Lem/Dropbox (CBQG)/BST210/homework/hw5/framingham.dta")
+library(foreign)
+fram <- read.dta(file = "C:/Users/Lem/Dropbox (CBQG)/BST210/project 2/framingham.dta")
 #fram <- read.dta(file = "~/BST210/framingham.dta")
 
 fram <- fram %>% mutate(metabolic = ifelse((totchol > 240 & (sysbp > 130 | bpmeds == 1) & bmicat > 2), 1, 0)) %>% filter(!is.na(totchol) & !is.na(sysbp) & !is.na(bpmeds) &!is.na(prevhyp) & !is.na(bmicat) & !is.na(diabetes) & !is.na(prevchd) & !is.na(prevstrk) & !is.na(age) & !is.na(sex) & !is.na(cigpday) & !is.na(cursmoke)) %>% mutate(id = agecat*sex)
@@ -21,6 +21,7 @@ dim(fram)
 fram %>% filter(diabetes == 1) %>% dim()
 fram %>% filter(prevhyp == 1) %>% dim()
 fram %>% filter(prevchd == 1) %>% dim()
+fram %>% filter(prevstrk == 1) %>% dim()
 fram %>% filter(metabolic ==1) %>% dim()
 
 fram <- fram %>% mutate(obese = ifelse((bmicat > 3), 1, 0))
@@ -35,11 +36,14 @@ fram$preexisting_m[fram$preexisting_m==3] <- 2
 
 #Table for figure 1
 fram %>% group_by(sex) %>% summarize(length(sex)) 
+
 fram %>% group_by(preexisting) %>% summarize(length(preexisting))
+
 fram %>% group_by(preexisting_m) %>% summarize(length(preexisting_m))
 
-fram %>% filter(agecat ==2 & sex == 2 & preexisting == 0) %>% dim()
+fram %>% group_by(preexisting) %>% summarize(mean = mean(cigpday), sd = sd(cigpday))
 
+fram %>% filter(metabolic == 1) %>% summarize(mean = mean(cigpday), sd = sd(cigpday))
 ```
 
 #Survival Analysis (K-M and log rank test)
@@ -277,6 +281,10 @@ model_sc = coxph(mortality ~ metabolic + preexisting + age + sex + cigpday, data
 plot(survfit(model_sc))
 summary(model_sc)
 
+cox.zph(model_sc)
+test_ph <- cox.zph(model_sc)
+ggcoxzph(test_ph)
+
 #EM smoking ***
 model_sc = coxph(mortality ~ metabolic + metabolic*cigpday + prevhyp + prevhyp*cigpday + diabetes + diabetes*cigpday + prevchd + prevchd*cigpday + prevstrk + prevstrk*cigpday + age + age*cigpday + sex + sex*cigpday + cigpday, data = fram)
 plot(survfit(model_sc))
@@ -291,6 +299,9 @@ summary(model_sc)
 model_sc = coxph(mortality ~ metabolic + preexisting + age + sex + cigpday + sex*cigpday, data = fram)
 plot(survfit(model_sc)) # best mod
 summary(model_sc)
+
+#Confounding of smoking
+#smoking could be a potential confounder of number of pre-existing conditions, pre-existing conditions, and metabolic syndrome as it changes the coefficients by > 10%.
 
 ```
 
@@ -322,6 +333,134 @@ ggcoxdiagnostics(model_sc, type = "dfbeta",
                  linear.predictions = FALSE, ggtheme = theme_bw())
 ```
 The above index plots show that comparing the magnitudes of the largest dfbeta values to the regression coefficients suggests that none of the observations is terribly influential individually, even though some of the dfbeta values for age and wt.loss are large compared with the others.
+
+#Stratification with cox model (agecat, pre-existing conditions, and number of pre-existing conditions)
+```{r}
+library(survival)
+model_c = coxph(mortality ~ metabolic + prevhyp + diabetes + prevchd + prevstrk + agecat + sex, data = fram)
+plot(survfit(model_c))
+summary(model_c)
+#agecat, prevhyp, and prevchd do not satisfy PH
+
+model_c = coxph(mortality ~ metabolic + preexisting + agecat + sex, data = fram)
+plot(survfit(model_c))
+summary(model_c)
+#agecat and preexisting do not satisfy PH
+
+#with smoking *** 
+model_sc = coxph(mortality ~ metabolic + prevhyp + diabetes + prevchd + prevstrk + agecat + sex + cigpday + sex*cigpday, data = fram)
+plot(survfit(model_sc))
+summary(model_sc)
+#agecat, prevhyp, and prevchd do not satisfy PH
+
+model_sc = coxph(mortality ~ metabolic + preexisting + agecat + sex + cigpday + sex*cigpday, data = fram)
+plot(survfit(model_sc))
+summary(model_sc)
+#agecat and preexisting do not satisfy PH
+
+cox.zph(model_sc)
+
+## stratification
+model_c = coxph(mortality ~ metabolic + prevhyp + diabetes + prevchd + prevstrk + I(agecat == 1) + sex, data = fram)
+plot(survfit(model_c))
+summary(model_c)
+model_c = coxph(mortality ~ metabolic + prevhyp + diabetes + prevchd + prevstrk + I(agecat == 2) + sex, data = fram)
+plot(survfit(model_c))
+summary(model_c)
+model_c = coxph(mortality ~ metabolic + prevhyp + diabetes + prevchd + prevstrk + I(agecat == 3) + sex, data = fram)
+plot(survfit(model_c))
+summary(model_c)
+model_c = coxph(mortality ~ metabolic + prevhyp + diabetes + prevchd + prevstrk + I(agecat == 4) + sex, data = fram)
+plot(survfit(model_c))
+summary(model_c)
+
+model_sc = coxph(mortality ~ metabolic + prevhyp + diabetes + prevchd + prevstrk + I(agecat == 1) + sex + cigpday + sex*cigpday, data = fram)
+plot(survfit(model_sc))
+summary(model_sc)
+model_sc = coxph(mortality ~ metabolic + prevhyp + diabetes + prevchd + prevstrk + I(agecat == 2) + sex + cigpday + sex*cigpday, data = fram)
+plot(survfit(model_sc))
+summary(model_sc)
+model_sc = coxph(mortality ~ metabolic + prevhyp + diabetes + prevchd + prevstrk + I(agecat == 3) + sex + cigpday + sex*cigpday, data = fram)
+plot(survfit(model_sc))
+summary(model_sc)
+model_sc = coxph(mortality ~ metabolic + prevhyp + diabetes + prevchd + prevstrk + I(agecat == 4) + sex + cigpday + sex*cigpday, data = fram)
+plot(survfit(model_sc))
+summary(model_sc)
+
+model_c = coxph(mortality ~ metabolic + I(preexisting == 0) + I(agecat == 1) + sex, data = fram)
+plot(survfit(model_c))
+summary(model_c)
+model_c = coxph(mortality ~ metabolic + I(preexisting == 0) + I(agecat == 2) + sex, data = fram)
+plot(survfit(model_c))
+summary(model_c)
+model_c = coxph(mortality ~ metabolic + I(preexisting == 0) + I(agecat == 3) + sex, data = fram)
+plot(survfit(model_c))
+summary(model_c)
+model_c = coxph(mortality ~ metabolic + I(preexisting == 0) + I(agecat == 4) + sex, data = fram)
+plot(survfit(model_c))
+summary(model_c)
+model_c = coxph(mortality ~ metabolic + I(preexisting == 1) + I(agecat == 1) + sex, data = fram)
+plot(survfit(model_c))
+summary(model_c)
+model_c = coxph(mortality ~ metabolic + I(preexisting == 1) + I(agecat == 2) + sex, data = fram)
+plot(survfit(model_c))
+summary(model_c)
+model_c = coxph(mortality ~ metabolic + I(preexisting == 1) + I(agecat == 3) + sex, data = fram)
+plot(survfit(model_c))
+summary(model_c)
+model_c = coxph(mortality ~ metabolic + I(preexisting == 1) + I(agecat == 4) + sex, data = fram)
+plot(survfit(model_c))
+summary(model_c)
+model_c = coxph(mortality ~ metabolic + I(preexisting == 2) + I(agecat == 1) + sex, data = fram)
+plot(survfit(model_c))
+summary(model_c)
+model_c = coxph(mortality ~ metabolic + I(preexisting == 2) + I(agecat == 2) + sex, data = fram)
+plot(survfit(model_c))
+summary(model_c)
+model_c = coxph(mortality ~ metabolic + I(preexisting == 2) + I(agecat == 3) + sex, data = fram)
+plot(survfit(model_c))
+summary(model_c)
+model_c = coxph(mortality ~ metabolic + I(preexisting == 2) + I(agecat == 4) + sex, data = fram)
+plot(survfit(model_c))
+summary(model_c)
+
+model_sc = coxph(mortality ~ metabolic + I(preexisting == 0) + I(agecat == 1) + sex + cigpday + sex*cigpday, data = fram)
+plot(survfit(model_sc))
+summary(model_sc)
+model_sc = coxph(mortality ~ metabolic + I(preexisting == 0) + I(agecat == 2) + sex + cigpday + sex*cigpday, data = fram)
+plot(survfit(model_sc))
+summary(model_sc)
+model_sc = coxph(mortality ~ metabolic + I(preexisting == 0) + I(agecat == 3) + sex + cigpday + sex*cigpday, data = fram)
+plot(survfit(model_sc))
+summary(model_sc)
+model_sc = coxph(mortality ~ metabolic + I(preexisting == 0) + I(agecat == 4) + sex + cigpday + sex*cigpday, data = fram)
+plot(survfit(model_sc))
+summary(model_sc)
+model_sc = coxph(mortality ~ metabolic + I(preexisting == 1) + I(agecat == 1) + sex + cigpday + sex*cigpday, data = fram)
+plot(survfit(model_sc))
+summary(model_sc)
+model_sc = coxph(mortality ~ metabolic + I(preexisting == 1) + I(agecat == 2) + sex + cigpday + sex*cigpday, data = fram)
+plot(survfit(model_sc))
+summary(model_sc)
+model_sc = coxph(mortality ~ metabolic + I(preexisting == 1) + I(agecat == 3) + sex + cigpday + sex*cigpday, data = fram)
+plot(survfit(model_sc))
+summary(model_sc)
+model_sc = coxph(mortality ~ metabolic + I(preexisting == 1) + I(agecat == 4) + sex + cigpday + sex*cigpday, data = fram)
+plot(survfit(model_sc))
+summary(model_sc)
+model_sc = coxph(mortality ~ metabolic + I(preexisting == 2) + I(agecat == 1) + sex + cigpday + sex*cigpday, data = fram)
+plot(survfit(model_sc))
+summary(model_sc)
+model_sc = coxph(mortality ~ metabolic + I(preexisting == 2) + I(agecat == 2) + sex + cigpday + sex*cigpday, data = fram)
+plot(survfit(model_sc))
+summary(model_sc)
+model_sc = coxph(mortality ~ metabolic + I(preexisting == 2) + I(agecat == 3) + sex + cigpday + sex*cigpday, data = fram)
+plot(survfit(model_sc))
+summary(model_sc)
+model_sc = coxph(mortality ~ metabolic + I(preexisting == 2) + I(agecat == 4) + sex + cigpday + sex*cigpday, data = fram)
+plot(survfit(model_sc))
+summary(model_sc)
+```
 
 #Conditional modeling
 ```{r}
